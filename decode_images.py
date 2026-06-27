@@ -56,51 +56,63 @@ class ExportOptions:
 # ── UI helpers ───────────────────────────────────────────────────────────────
 
 
-def _build_hint(default: str | None, choices: list[str] | None) -> str:
-    if choices:
-        opts = "  /  ".join(f"[{c}]" if c == default else c for c in choices)
-        return f"  ({opts})"
-    if default is not None:
-        return f"  [{default}]"
-    return ""
+def _read(prompt: str) -> str:
+    try:
+        return input(prompt).strip()
+    except (KeyboardInterrupt, EOFError):
+        print("\nCancelled.")
+        sys.exit(0)
 
 
-def _validate(
-    answer: str,
-    default: str | None,
-    choices: list[str] | None,
-) -> str | None:
-    """Return the accepted value, or None to keep looping."""
-    if not answer:
-        return default
-    if choices and answer not in choices:
-        print(f"    Valid options: {', '.join(choices)}")
-        return None
-    return answer
-
-
-def ask(
-    question: str,
-    default: str | None = None,
-    choices: list[str] | None = None,
-) -> str:
-    hint = _build_hint(default, choices)
+def choose(question: str, options: list[str], default: str) -> str:
+    """Numbered menu. Returns the selected option string."""
+    print(f"  {question}:")
+    for i, opt in enumerate(options, 1):
+        marker = " (default)" if opt == default else ""
+        print(f"    {i}. {opt}{marker}")
+    default_idx = options.index(default) + 1
     while True:
+        raw = _read(f"  > [{default_idx}] ")
+        if not raw:
+            return default
         try:
-            answer = input(f"  {question}{hint}: ").strip()
-        except (KeyboardInterrupt, EOFError):
-            print("\nCancelled.")
-            sys.exit(0)
-        result = _validate(answer, default, choices)
-        if result is not None:
-            return result
+            idx = int(raw)
+            if 1 <= idx <= len(options):
+                return options[idx - 1]
+        except ValueError:
+            pass
+        print(f"    Enter a number between 1 and {len(options)}.")
+
+
+def confirm(question: str, default: bool = True) -> bool:
+    """y/n prompt."""
+    hint = "[Y/n]" if default else "[y/N]"
+    while True:
+        raw = _read(f"  {question} {hint}: ").lower()
+        if not raw:
+            return default
+        if raw in ("y", "yes"):
+            return True
+        if raw in ("n", "no"):
+            return False
+
+
+def ask(question: str, default: str = "") -> str:
+    """Free-text prompt with an optional default."""
+    hint = f" [{default}]" if default else ""
+    while True:
+        raw = _read(f"  {question}{hint}: ")
+        if raw:
+            return raw
+        if default is not None:
+            return default
 
 
 def wait_for_input(path: Path) -> None:
     print(f"  File created: {path}")
     print("  Open it, paste the data URIs, save it, then come back here.")
     print()
-    input("  Press Enter when ready...")
+    _read("  Press Enter when ready...")
 
 
 # ── Image processing ─────────────────────────────────────────────────────────
@@ -160,17 +172,9 @@ def save_image(name: str, raw: bytes, opts: ExportOptions) -> Path | None:
 
 
 def prepare_input_file(path: Path) -> None:
-    if path.exists():
-        resp = ask(
-            f"'{INPUT_FILENAME}' already exists. Open it or clear it?",
-            default="open",
-            choices=["open", "clear"],
-        )
-        if resp == "clear":
-            path.write_text(INPUT_TEMPLATE, encoding="utf-8")
-    else:
+    if not path.exists():
         path.write_text(INPUT_TEMPLATE, encoding="utf-8")
-
+    print()
     wait_for_input(path)
 
 
@@ -179,7 +183,8 @@ def collect_options(cwd: Path) -> ExportOptions:
     print("  ── Export options ───────────────────────")
     print()
 
-    fmt = ask("Output format", default="jpeg", choices=["jpeg", "webp", "png"])
+    fmt = choose("Output format", ["jpeg", "webp", "png"], default="jpeg")
+    print()
 
     quality = 80
     if fmt != "png":
@@ -195,7 +200,7 @@ def collect_options(cwd: Path) -> ExportOptions:
     except ValueError:
         pass
 
-    subfolder = ask("Output subfolder (Enter = current directory)", default="")
+    subfolder = ask("Output subfolder (Enter = current directory)")
     out_dir = (cwd / subfolder) if subfolder else cwd
 
     return ExportOptions(fmt=fmt, quality=quality, max_size=max_size, out_dir=out_dir)
@@ -218,8 +223,7 @@ def process_images(input_file: Path, opts: ExportOptions, cwd: Path) -> int:
 
 
 def cleanup(input_file: Path) -> None:
-    resp = ask(f"Delete '{INPUT_FILENAME}'?", default="y", choices=["y", "n"])
-    if resp == "y":
+    if confirm(f"Delete '{INPUT_FILENAME}'?", default=True):
         input_file.unlink(missing_ok=True)
         print(f"  '{INPUT_FILENAME}' deleted.")
 
