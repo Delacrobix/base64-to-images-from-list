@@ -3,9 +3,7 @@
 
 import base64
 import io
-import os
 import re
-import subprocess
 import sys
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -98,14 +96,11 @@ def ask(
             return result
 
 
-def open_editor(path: Path) -> None:
-    editor = os.environ.get("VISUAL") or os.environ.get("EDITOR") or "nano"
-    try:
-        subprocess.run([editor, str(path)], check=False)
-    except FileNotFoundError:
-        print(f"    Editor '{editor}' not found.")
-        print(f"    Open {path} manually, paste the data URIs, and save.")
-        input("    Press Enter when done...")
+def wait_for_input(path: Path) -> None:
+    print(f"  File created: {path}")
+    print("  Open it, paste the data URIs, save it, then come back here.")
+    print()
+    input("  Press Enter when ready...")
 
 
 # ── Image processing ─────────────────────────────────────────────────────────
@@ -176,11 +171,7 @@ def prepare_input_file(path: Path) -> None:
     else:
         path.write_text(INPUT_TEMPLATE, encoding="utf-8")
 
-    print()
-    print(f"  Opening {INPUT_FILENAME} in your editor...")
-    print("  Paste the data URIs, save the file, and close the editor.")
-    print()
-    open_editor(path)
+    wait_for_input(path)
 
 
 def collect_options(cwd: Path) -> ExportOptions:
