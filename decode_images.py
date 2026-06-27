@@ -193,17 +193,7 @@ def collect_options(cwd: Path) -> ExportOptions:
         except ValueError:
             pass
 
-    max_size: int | None = None
-    try:
-        ms = int(ask("Max size in pixels (0 = no limit)", default="0"))
-        max_size = ms or None
-    except ValueError:
-        pass
-
-    subfolder = ask("Output subfolder (Enter = current directory)")
-    out_dir = (cwd / subfolder) if subfolder else cwd
-
-    return ExportOptions(fmt=fmt, quality=quality, max_size=max_size, out_dir=out_dir)
+    return ExportOptions(fmt=fmt, quality=quality, max_size=None, out_dir=cwd / "images")
 
 
 def process_images(input_file: Path, opts: ExportOptions, cwd: Path) -> int:
